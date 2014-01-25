@@ -1,0 +1,79 @@
+library main
+{
+    use system;
+    use format;
+}
+
+module main
+{
+    use system;
+    use format;
+}
+
+module main
+
+# c like language
+
+var source_text[?], s{} byte; # we have arrays and sets
+var a bool;              # we have booleans!
+var s1{0x1..0xff} byte;  # we have sets!
+var x^,T^,y^^^ func(func(int) int, a[?][?] int) int;
+const scanner_pos = 0 size_t;
+const end_of_file = 0 int;
+
+func test(int a, int b) int,int #multiple returns
+{
+    var c^ int; #postfix  pointers derefs
+    if (0 < c < 2000)  # no op precedence, no short circuit
+    {
+        c^ += (a + b); # deref is postfix
+    }
+    return c,0;
+}
+
+var jump_table[?] f(int,int) int; # dynamic jump tables 
+max_states = 14 int;
+
+typedef target^ func(int,int) int;
+parser_dfs[0x01..0x7f][max_states] target; # table driven dfs
+
+func next_char() int
+{
+    for var c int from 0 do
+    {
+        c := source_text[scanner_pos];
+        switch(c)
+        {
+        case 1r16 .. 7fr16: #ascii
+            scanner_pos := scanner_pos + 1;
+            return c;
+        case c2r16 .. dfr16: #two bytes
+        case e0r16 .. efr16: #three bytes
+        case f0r16 .. f4r16: #four bytes  
+        case f5r16 .. ffr16: fallthru # default is to break 
+        default: 
+            scanner_pos := scanner_pos + 1;
+        }
+        scanner_pos += 1; 
+    }
+    until(c = end_of_source);
+}
+
+typedef hundred_set{0 .. 100} int; #we have user defined types and sets!
+
+func proc() int
+{
+    var s1{3 .. 2000}, s1_p{3 .. 2000}^ int; #declaration of set and pointer
+    var s_p* hundred_set; #pointer to set type   
+    
+    s1 := {5, 6, 20};
+    if (6 in s1)
+    {
+        go_for_it();
+    }
+}
+
+func main(argc int, argv^[] byte) int
+{
+
+}
