@@ -1,156 +1,82 @@
-struct symbol_entry
-{
-    enum symbol_type t;
-    union
-    {
-        struct keyword
-        {
-            enum token_id id; 
-        }
-        struct name
-        {
-            struct fat_pointer * lexeme;
-            struct symbol_entry * next;
-        }
-        struct symbol_descriptor
-        {
-            enum symbol_kind kind;
-            union 
-            {
-                struct func
-                {
-                    void * name;
-                    struct symbol_entry * param_types;
-                    void * adress;
-                }                
-                struct library
-                {
-                    struct fat_pointer * name;
-                    void * address;
-                }
-                struct module
-                {
-                    struct fat_pointer * name;
-                    void * address; 
-                } 
-                struct variable
-                {
-                    struct fat_pointer * name;
-                    enum primitive_types t;
-                    void * address;
-                } 
-                struct type_decl
-                {
-                    struct fat_pointer * name; 
-                    struct symbol_entry * type_list;
-                }
-            }
-            struct symbol_entry * parent; //scope
-            struct symbol_entry * sibling; 
-            struct symbol_entry * children; //do we need this? 
-        } 
-    }
-    struct symbol_entry * next; //symbol table chain 
-}
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include "fat_pointer.h"
+#include "token_id.h"
+#include "symbol_entry.h"
 
+const int symbol_table_initval = 0x13371337;
+
+const int symbol_table_size = 1 << 10;
+struct symbol_entry symbol_table[1 << 10];
+struct symbol_entry default_desc, *not_found_desc;
+
+extern struct symbol_entry *reserved_words[];
 
 int
 initialise_symbol_table()
 {
     int i;
-    not_found_desc = &default_desc;
-    memset(not_found_desc, 0, sizeof(*not_found_desc));
-    not_found_desc->n = not_found_desc;
-    not_found_desc->t_type = t_not_found;
+
+    memset(symbol_table, 0, sizeof(symbol_table));
     for(i = 0; i < symbol_table_size; i++)
     {
-        symbol_table[i] = not_found_desc;
+        symbol_table[i].next = &symbol_table[i]; 
     }
     //load keywords
     for(i = 0; reserved_words[i]; i++)
     {
-        struct symbol_descriptor * desc;
-        desc = reserved_words[i];
-        put_in_symbol_table(&desc->lexeme, desc->lexeme_len, desc);
+        struct symbol_entry * entry;
+        entry = reserved_words[i];
+        put_in_symbol_table(entry);
     }
     return 0;
 }
 
 int
-put_in_symbol_table(struct fat_pointer * l, size_t len,
-    struct symbol_descriptor * d)
+put_in_symbol_table(struct symbol_entry * e)
 {
-     uint32_t i;  
+     unsigned int i;  
          
      printf("put in symbol table\n");
-     struct symbol_descriptor * n;
-     i = hashword(l->buff, len, symbol_table_initval) & 0x3ff;
-     n = symbol_table[i]; //get the dummy node
-     if (n == n->n) //empty slot
-     {
-         struct symbol_descriptor * h;
-         h = make_symbol_descriptor();
-         h->t_type = t_not_found;
-         h->n = d;
-         d->n = h;
-         symbol_table[i] = h;
-     }
-     else
-     {
-         d->n = n->n; //insert in head of circular list
-         n->n = d;
-     }
+     struct symbol_entry * n;
+     i = hashword(e->lexeme.buff, e->lexeme.buflen, symbol_table_initval) & 0x3ff;
+     n = &symbol_table[i]; //get the dummy node
+
+     e->next = n->next; //insert in head of circular list
+     n->next = e;
+
      return 0;
 }
 
-struct symbol_descriptor *
+struct symbol_entry *
 get_from_symbol_table(struct fat_pointer * l, size_t len)
 {
-     uint32_t i;
-     struct symbol_descriptor * n;
+    unsigned int i;
+    struct symbol_entry * n;
              
-     printf("get from symbol table\n");
-     i = hashword(l->buff, len, symbol_table_initval) & 0x3ff;
-     printf("computed hash index at %d\n", i);
-     n = symbol_table[i]; //get head node
-     if (n != n->n)
-     {                                                                          
-         printf("found chain at %d\n", i);
-         //n->lexeme = *l;
-         if (n->lexeme.buflen == 0)
-         {
-             n->lexeme.buff = malloc(l->buflen);
-             printf("malloc head node lexeme buff\n");
-         }
-         else if (n->lexeme.buflen < l->buflen)
-         {
-             void * t;
-             t = realloc(n->lexeme.buff, l->buflen);                            
-             if (t)
-             {
-                 n->lexeme.buff = t;
-             }
-             else
-                 exit(700);
-             printf("realloc head node lexeme buff\n");
-         }
-         n->lexeme.buflen = l->buflen;
-         memcpy(n->lexeme.buff,l->buff, len * sizeof(unsigned int));
-         n->lexeme_len = len;                                                   
-         n = n->n;
-         printf("searching chains %p\n", n);
-         while(memcmp(l->buff, n->lexeme.buff,
-             len * sizeof(unsigned int)) != 0) //search chains
-         {
-             n = n->n;
-             printf("searching chains %p\n", n);
-         }
-         if (n != symbol_table[i])
-         {
-             printf("found symbol desc at %p\n", n);                            
-         }
+    printf("get from symbol table\n");
+    i = hashword(l->buff, len, symbol_table_initval) & 0x3ff;
+    printf("computed hash index at %d\n", i);
+    n = &symbol_table[i]; //get head node
+
+    //special case: empty list
+    if (n == n->next) return 0;
+                                                                          
+    n->lexeme.buflen = l->buflen;
+    n->lexeme.buff = l->buff;
+    n->lexeme_len = len;                                                   
+    n = n->next;
+
+    printf("searching chains %p\n", n);
+    while(memcmp(l->buff, n->lexeme.buff,
+          len * sizeof(unsigned int)) != 0) //search chains
+    {
+        n = n->next;
+        printf("searching chains %p\n", n);
     }
+    if (n == &symbol_table[i])
+        return 0;
     else
-        printf("found empty slot at %d\n", i);
-    return n;
+        return n;
 }

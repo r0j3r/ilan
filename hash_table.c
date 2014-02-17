@@ -1,3 +1,5 @@
+#include <sys/types.h>
+#include <stdint.h>
 
 #define hashsize(n) ((uint32_t)1<<(n))
 #define hashmask(n) (hashsize(n)-1)
@@ -10,7 +12,7 @@
     c -= b; c ^= rot(b, 8); b += a; \
     a -= c; a ^= rot(c,16); c += b; \
     b -= a; b ^= rot(a,19); a += c; \
-    c -= b; c ^= rot(b, 4); b += a; \ 
+    c -= b; c ^= rot(b, 4); b += a; \
 }
 
 #define final(a,b,c) \
